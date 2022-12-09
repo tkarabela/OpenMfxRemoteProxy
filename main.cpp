@@ -26,7 +26,25 @@ int main() {
         std::cout << "I see input named "<< effectInput.name() <<std::endl;
 
       for (auto& prop : effectInput.properties) {
-        std::cout << "I see input property named "<< prop.index() << " = " << prop.value[0].as_int <<std::endl;
+        std::cout << "I see input property named "<< prop.index() << " = ";
+        switch (prop.type) {
+          case OpenMfx::PropertyType::Int:
+            std::cout << prop.value[0].as_int << " (int)";
+            break;
+          case OpenMfx::PropertyType::Double:
+            std::cout << prop.value[0].as_double<< " (double)";
+            break;
+          case OpenMfx::PropertyType::String:
+            std::cout << prop.value[0].as_const_char<< " (string)";
+            break;
+          case OpenMfx::PropertyType::Pointer:
+            std::cout << prop.value[0].as_pointer<< " (pointer)";
+            break;
+          default:
+            std::cout << prop.value[0].as_int<< " (UNKNOWN TYPE!)";
+            break;
+        }
+        std::cout << std::endl;
       }
 
         for (auto& requestedAttribute : effectInput.requested_attributes) {
