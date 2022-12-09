@@ -1,0 +1,4 @@
+[submodule "OpenMfx"]
+	path = OpenMfx
+	url = https://github.com/tkarabela/OpenMeshEffect
+	branch = OpenMfxRemoteProxy
