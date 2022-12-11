@@ -36,11 +36,9 @@ table OfxParameter {
 
 // a single plugin (effect)
 table OfxPlugin {
-    pluginApi: string;
-    apiVersion: int;
-    pluginIdentifier: string;
-    pluginVersionMajor: int;
-    pluginVersionMinor: int;
+    identifier: string;
+    version_major: int;
+    version_minor: int;
 }
 
 // description of .ofx bundle with possibly multiple plugins (effects)
@@ -48,10 +46,73 @@ table OfxBundle {
     plugins: [OfxPlugin];
 }
 
-table OpenMfxRemoteProxyDescribe {
-    plugin_name: string;
+table OfxPluginDescription {
     inputs: [OfxMesh];
     parameters: [OfxParameter];
 }
 
-root_type OpenMfxRemoteProxyDescribe;
+table OfxPluginWithDescription {
+    plugin: OfxPlugin;
+    description: OfxPluginDescription;
+}
+
+table RPDescribeRequest {
+
+}
+
+table RPDescribeResponse {
+    plugins: [OfxPluginWithDescription];
+}
+
+table RPCreateInstanceRequest {
+    plugin_identifier: string;
+}
+
+table RPCreateInstanceResponse {
+    instance_id: int;
+    ok: bool;
+}
+
+table RPDestroyInstanceRequest {
+    plugin_identifier: string;
+    instance_id: int;
+}
+
+table RPDestroyInstanceResponse {
+    ok: bool;
+}
+
+table RPActionIsIdentityRequest {
+    plugin_identifier: string;
+    instance_id: int;
+    parameters: [OfxParameter];
+    in_args: [OfxProperty];
+}
+
+table RPActionIsIdentityResponse {
+    status: string;
+    out_args: [OfxProperty];
+}
+
+
+table RPCookRequest {
+    plugin_identifier: string;
+    instance_id: int;
+    parameters: [OfxParameter];
+    inputs: [OfxMesh];
+    in_args: [OfxProperty];
+}
+
+// TODO add intermittent messages for inputGetMesh, inputReleaseMesh ie. BeforeMeshGet, BeforeMeshRelease
+
+table RPCookResponse {
+    status: string;
+    outputs: [OfxMesh];
+}
+
+union RPMessage {
+    RPDescribeRequest,
+    RPDescribeResponse
+}
+
+root_type RPMessage;
