@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(INC
         .
+        ./include
         ./OpenMfx/include
         ./OpenMfx/sdk/cpp/common/include
         ./OpenMfx/sdk/cpp/host/include)
