@@ -1,5 +1,8 @@
+import concurrent.futures
 from dataclasses import dataclass
 from time import sleep
+from enum import StrEnum
+import json
 
 import zmq
 from threading import Lock, Thread
@@ -31,14 +34,19 @@ class ProxyBroker:
         wlist_ = []  # XXX ?
         xlist_ = [self.pub_socket, self.sub_socket, self.pair_socket]
 
-        # XXX here we really need to poll
         while True:
             print_(f"{self}: Calling zmq.select")
             rlist, wlist, xlist = zmq.select(rlist_, wlist_, xlist_)
             for sock in rlist:
                 data = sock.recv()
-                msg = Message.from_bytes(data)
-                print_(f"{self}: Received message: {msg}")
+                if sock is self.sub_socket:
+                    print_(f"{self}: Received message from sub socket, forwarding to pair: {data}")
+                    self.pair_socket.send(data)  # XXX efficiency?
+                elif sock is self.pair_socket:
+                    print_(f"{self}: Received message from pair socket, forwarding to pub: {data}")
+                    self.pub_socket.send(data)
+                else:
+                    raise RuntimeError
 
             for sock in xlist:
                 print_(f"{self}: Error on socket: {sock}")
@@ -57,20 +65,21 @@ class ProxyPluginInstance:
     mutex: Lock
     is_proxy_plugin: bool
 
-    def make_request_message(self, body: str) -> "Message":
-        return Message(self.instance_id, False, body)
+    def make_request_message(self, type_: "MessageType", data: dict) -> "Message":
+        return Message(self.instance_id, type_, data)
 
-    def action_describe(self, parameters: str):
+    def action_describe(self, parameters: str) -> str:
         print_(f"{self}: starting action describe with parameters: {parameters}")
         if self.is_proxy_plugin:
             return self._plugin_action_describe(parameters)
         else:
-            return self._host_action_describe(parameters)
+            self._host_action_describe(parameters)
+            return ""
 
-    def _plugin_action_describe(self, parameters: str):
+    def _plugin_action_describe(self, parameters: str) -> str:
         print_(f"{self}: acquiring mutex")
         with self.mutex:
-            cook_msg = self.make_request_message(f"cook({parameters})")
+            cook_msg = self.make_request_message(MessageType.ActionDescribeStart, {"parameters": parameters})
             print_(f"{self}: sending message to pub socket: {cook_msg}")
             self.pub_socket.send(cook_msg.to_bytes())
             print_(f"{self}: after pub_socket.send()")
@@ -78,10 +87,36 @@ class ProxyPluginInstance:
             while True:
                 print_(f"{self}: calling sub_socket.recv()")
                 data = self.sub_socket.recv()
-                print_(f"{self}: received data: {data}")
+                msg = Message.from_bytes(data)
+                if msg.type_ == MessageType.ActionDescribeEnd:
+                    inputs = msg.data["inputs"]
+                    parameters = msg.data["parameters"]
+                    status = msg.data["status"]
+                    print_(f"{self}: now I would call OFX host and set inputs: {inputs}")
+                    print_(f"{self}: now I would call OFX host and set parameters: {parameters}")
+                    print_(f"{self}: returning from describe with received status: {status}")
+                    return status
+                else:
+                    print_(f"{self}: unexpected message in describe!")
+                    break
+
+        return "kOfxStatusErr"
 
     def _host_action_describe(self, parameters: str):
-        raise NotImplementedError
+        print_(f"{self}: starting describe with parameters: {parameters}")
+
+        msg = self.make_request_message(MessageType.ActionDescribeEnd, {
+            "inputs": ["input1", "input2"],
+            "parameters": ["a", "b", parameters],
+            "status": "kOfxStatusOk",
+        })
+
+        print_(f"{self}: sleeping in describe")
+        sleep(4)
+
+        print_(f"{self}: sending describe respones: {msg}")
+        self.pub_socket.send(msg.to_bytes())
+        print_(f"{self}: describe is finished")
 
     def run_proxy_thread(self):
         print_(f"{self}: Hello")
@@ -98,6 +133,10 @@ class ProxyPluginInstance:
                 data = sock.recv()
                 msg = Message.from_bytes(data)
                 print_(f"{self}: Received message: {msg}")
+                if msg.type_ == MessageType.ActionDescribeStart:
+                    self.action_describe(msg.data["parameters"])  # XXX pass params properly
+                else:
+                    print_(f"{self}: Unexpected message!")
 
             for sock in xlist:
                 print_(f"{self}: Error on socket: {sock}")
@@ -119,28 +158,30 @@ class ProxyHost:
     effect_instances: list[ProxyPluginInstance]
 
 
+class MessageType(StrEnum):
+    ActionDescribeStart = "ActionDescribeStart"
+    ActionDescribeEnd = "ActionDescribeEnd"
+
 @dataclass
 class Message:
     instance_id: int
-    response: bool
-    body: str
-
-    def make_reply(self, body: str) -> "Message":
-        return Message(self.instance_id, True, body)
+    type_: MessageType
+    data: dict
 
     @staticmethod
     def get_instance_prefix(instance_id) -> bytes:
         return f"{instance_id:08d}".encode("ascii")
 
     def to_bytes(self) -> bytes:
-        return f"{self.instance_id:08d}-{self.response:d}-{self.body}".encode("ascii")
+        return f"{self.instance_id:08d}-{self.type_}-{json.dumps(self.data)}".encode("ascii")
 
     @classmethod
     def from_bytes(cls, s: bytes) -> "Message":
+        tmp = s.split(b"-", 2)
         return cls(
-            instance_id=int(s[0:8].decode("ascii")),
-            response=s[9] == b"1",
-            body=s[11:].decode("ascii")
+            instance_id=int(tmp[0].decode("ascii")),
+            type_=MessageType(tmp[1].decode("ascii")),
+            data=json.loads(tmp[2])
         )
 
 def main():
@@ -222,9 +263,17 @@ def main():
     print_("XXX sleeping to make sure everything starts")
     sleep(1)
 
+    # test OFX host calling in serial
     print_("OFX host: invoking describe action...")
     rv = proxy_plugin_global_instance.action_describe("describe params")  # host thread
     print_("OFX host: describe action returned", rv)
 
+    # test OFX host calling in parallel
+    print_("OFX host: invoking describe action in parallel from multiple threads...")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(proxy_plugin_global_instance.action_describe, f"describe params {i}") for i in range(10)]
+        for future in concurrent.futures.as_completed(futures):
+            data = future.result()
+            print_("OFX host: I got result:", data)
 
 main()
