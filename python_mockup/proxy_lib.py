@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from time import sleep
 from enum import StrEnum
 import json
+from typing import Optional
 
 import zmq
 from threading import Lock, Thread
@@ -27,8 +28,17 @@ class ProxyBroker:
     pair_socket: zmq.Socket
     is_proxy_plugin: bool
 
-    def run_proxy_thread(self):
-        print_(f"{self}: Hello")
+    def run_plugin_proxy_thread(self):
+        # first, wait on proxy host
+
+        data = self.pair_socket.recv()
+        msg = Message.from_bytes(data)
+        if msg.type_ == MessageType.RemoteHostStarted:
+            print_(f"{self} - got confirmation from remote host, starting main loop")
+        else:
+            raise RuntimeError("expected RemoteHostStarted")
+
+        # start main loop
 
         rlist_ = [self.sub_socket, self.pair_socket]
         wlist_ = []  # XXX ?
@@ -51,6 +61,44 @@ class ProxyBroker:
             for sock in xlist:
                 print_(f"{self}: Error on socket: {sock}")
 
+    def run_host_proxy_thread(self):
+        # first, notify proxy plugin
+
+        print_(f"{self} - sending confirmation to remote plugin")
+        msg = Message(-1, MessageType.RemoteHostStarted, {})
+        self.pair_socket.send(msg.to_bytes())
+
+        # start main loop
+
+        rlist_ = [self.sub_socket, self.pair_socket]
+        wlist_ = []  # XXX ?
+        xlist_ = [self.pub_socket, self.sub_socket, self.pair_socket]
+
+        while True:
+            print_(f"{self}: Calling zmq.select")
+            rlist, wlist, xlist = zmq.select(rlist_, wlist_, xlist_)
+            for sock in rlist:
+                data = sock.recv()
+                if sock is self.sub_socket:
+                    print_(f"{self}: Received message from sub socket, forwarding to pair: {data}")
+                    self.pair_socket.send(data)  # XXX efficiency?
+                elif sock is self.pair_socket:
+                    print_(f"{self}: Received message from pair socket, forwarding to pub: {data}")
+                    self.pub_socket.send(data)
+                else:
+                    raise RuntimeError
+
+            for sock in xlist:
+                print_(f"{self}: Error on socket: {sock}")
+
+    def run_proxy_thread(self):
+        print_(f"{self}: Hello")
+
+        if self.is_proxy_plugin:
+            return self.run_plugin_proxy_thread()
+        else:
+            return self.run_host_proxy_thread()
+
     def __str__(self) -> str:
         if self.is_proxy_plugin:
             return "ProxyBroker(plugin)"
@@ -62,8 +110,9 @@ class ProxyPluginInstance:
     instance_id: int
     pub_socket: zmq.Socket
     sub_socket: zmq.Socket
-    mutex: Lock
     is_proxy_plugin: bool
+    mutex: Optional[Lock] = None
+    thread: Optional[Thread] = None
 
     def make_request_message(self, type_: "MessageType", data: dict) -> "Message":
         return Message(self.instance_id, type_, data)
@@ -161,6 +210,7 @@ class ProxyHost:
 class MessageType(StrEnum):
     ActionDescribeStart = "ActionDescribeStart"
     ActionDescribeEnd = "ActionDescribeEnd"
+    RemoteHostStarted = "RemoteHostStarted"
 
 @dataclass
 class Message:
@@ -173,108 +223,13 @@ class Message:
         return f"{instance_id:08d}".encode("ascii")
 
     def to_bytes(self) -> bytes:
-        return f"{self.instance_id:08d}-{self.type_}-{json.dumps(self.data)}".encode("ascii")
+        return f"{self.instance_id:08d}/{self.type_}/{json.dumps(self.data)}".encode("ascii")
 
     @classmethod
     def from_bytes(cls, s: bytes) -> "Message":
-        tmp = s.split(b"-", 2)
+        tmp = s.split(b"/", 2)
         return cls(
             instance_id=int(tmp[0].decode("ascii")),
             type_=MessageType(tmp[1].decode("ascii")),
             data=json.loads(tmp[2])
         )
-
-def main():
-    context = zmq.Context()
-
-    plugin_broker_pub_address = "inproc://plugin_broker_pub"
-    plugin_broker_sub_address = "inproc://plugin_broker_sub"
-    plugin_broker_pair_address = "tcp://127.0.0.1:5557"
-    host_broker_pub_address = "inproc://host_broker_pub"
-    host_broker_sub_address = "inproc://host_broker_sub"
-    # proxy_plugin_global_instance_pub_address = "tcp://127.0.0.1:5560"  # XXX dont want this, broker should bind
-    # proxy_plugin_global_instance_sub_address = "tcp://127.0.0.1:5561"
-    # proxy_host_global_instance_pub_address = "tcp://127.0.0.1:5562"
-    # proxy_host_global_instance_sub_address = "tcp://127.0.0.1:5563"
-
-    plugin_broker = ProxyBroker(
-        pub_socket=context.socket(zmq.PUB),
-        sub_socket=context.socket(zmq.SUB),
-        pair_socket=context.socket(zmq.PAIR),
-        is_proxy_plugin=True
-    )
-
-    host_broker = ProxyBroker(
-        pub_socket=context.socket(zmq.PUB),
-        sub_socket=context.socket(zmq.SUB),
-        pair_socket=context.socket(zmq.PAIR),
-        is_proxy_plugin=False
-    )
-
-    plugin_broker.pub_socket.bind(plugin_broker_pub_address)
-    plugin_broker.sub_socket.bind(plugin_broker_sub_address)
-    plugin_broker.sub_socket.subscribe("")
-    plugin_broker.pair_socket.bind(plugin_broker_pair_address)
-    host_broker.pub_socket.bind(host_broker_pub_address)
-    host_broker.sub_socket.bind(host_broker_sub_address)
-    host_broker.sub_socket.subscribe("")
-    host_broker.pair_socket.connect(plugin_broker_pair_address)
-
-    proxy_plugin_global_instance = ProxyPluginInstance(
-        instance_id=0,
-        pub_socket=context.socket(zmq.PUB),
-        sub_socket=context.socket(zmq.SUB),
-        mutex=Lock(),
-        is_proxy_plugin=True
-    )
-
-    proxy_plugin_global_instance.pub_socket.connect(plugin_broker_sub_address)
-    proxy_plugin_global_instance.sub_socket.connect(plugin_broker_pub_address)
-    proxy_plugin_global_instance.sub_socket.subscribe(Message.get_instance_prefix(proxy_plugin_global_instance.instance_id))
-
-    proxy_host_global_instance = ProxyPluginInstance(
-        instance_id=0,
-        pub_socket=context.socket(zmq.PUB),
-        sub_socket=context.socket(zmq.SUB),
-        mutex=Lock(),
-        is_proxy_plugin=False
-    )
-
-    proxy_host_global_instance.pub_socket.connect(host_broker_sub_address)
-    proxy_host_global_instance.sub_socket.connect(host_broker_pub_address)
-    proxy_host_global_instance.sub_socket.subscribe(Message.get_instance_prefix(proxy_host_global_instance.instance_id))
-
-    # -------------------------------------
-
-    print_("starting plugin_broker_thread...")
-    plugin_broker_thread = Thread(target=plugin_broker.run_proxy_thread)
-    plugin_broker_thread.start()
-
-    print_("starting host_broker_thread...")
-    host_broker_thread = Thread(target=host_broker.run_proxy_thread)
-    host_broker_thread.start()
-
-    print_("starting proxy_host_global_instance_thread...")
-    proxy_host_global_instance_thread = Thread(target=proxy_host_global_instance.run_proxy_thread)
-    proxy_host_global_instance_thread.start()
-
-    # -------------------------------------
-    # XXX issue: message sent before receiver is ready
-    print_("XXX sleeping to make sure everything starts")
-    sleep(1)
-
-    # test OFX host calling in serial
-    print_("OFX host: invoking describe action...")
-    rv = proxy_plugin_global_instance.action_describe("describe params")  # host thread
-    print_("OFX host: describe action returned", rv)
-
-    # test OFX host calling in parallel
-    print_("OFX host: invoking describe action in parallel from multiple threads...")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(proxy_plugin_global_instance.action_describe, f"describe params {i}") for i in range(10)]
-        for future in concurrent.futures.as_completed(futures):
-            data = future.result()
-            print_("OFX host: I got result:", data)
-
-if __name__ == "__main__":
-    main()
