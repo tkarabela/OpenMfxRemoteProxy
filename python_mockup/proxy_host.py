@@ -1,9 +1,10 @@
 import sys
+from time import sleep
 from threading import Lock, Thread
 
 import zmq
 
-from proxy_lib import ProxyBroker, ProxyPluginInstance, Message
+from proxy_lib import ProxyHostBroker, ProxyPluginInstance, Message
 
 BROKER_PUB_ADDRESS = "inproc://host_broker_pub"
 BROKER_SUB_ADDRESS = "inproc://host_broker_sub"
@@ -11,11 +12,10 @@ BROKER_SUB_ADDRESS = "inproc://host_broker_sub"
 class ProxyHost:
     def __init__(self, context: zmq.Context, plugin_broker_pair_address: str):
         self.context = context
-        self.proxy_broker = ProxyBroker(
+        self.proxy_broker = ProxyHostBroker(
             pub_socket=context.socket(zmq.PUB),
             sub_socket=context.socket(zmq.SUB),
             pair_socket=context.socket(zmq.PAIR),
-            is_proxy_plugin=False
         )
         self.proxy_broker.pub_socket.bind(BROKER_PUB_ADDRESS)
         self.proxy_broker.sub_socket.bind(BROKER_SUB_ADDRESS)
@@ -43,6 +43,8 @@ class ProxyHost:
         proxy_host_global_instance.thread.start()
 
     def run(self):
+        # print("XXX lazy proxy host, sleeping for a long time...")
+        # sleep(10)
         self.proxy_broker.run_proxy_thread()
 
 

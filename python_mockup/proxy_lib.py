@@ -1,12 +1,12 @@
 import concurrent.futures
 from dataclasses import dataclass
 from time import sleep
-from enum import StrEnum
+from enum import Enum
 import json
 from typing import Optional
 
 import zmq
-from threading import Lock, Thread
+from threading import Lock, Thread, Condition
 
 PRINT_LOCK = Lock()
 def print_(*args):
@@ -26,17 +26,38 @@ class ProxyBroker:
     pub_socket: zmq.Socket
     sub_socket: zmq.Socket
     pair_socket: zmq.Socket
-    is_proxy_plugin: bool
 
-    def run_plugin_proxy_thread(self):
+    def run_proxy_thread(self):
+        raise NotImplementedError
+
+@dataclass
+class ProxyPluginBroker(ProxyBroker):
+    status_ready: Optional[bool]
+    status_ready_condvar: Condition
+
+    def wait_for_status_ready(self) -> bool:
+        with self.status_ready_condvar:
+            self.status_ready_condvar.wait_for(lambda: self.status_ready is not None)
+            return self.status_ready
+
+    def run_proxy_thread(self):
         # first, wait on proxy host
 
-        data = self.pair_socket.recv()
-        msg = Message.from_bytes(data)
-        if msg.type_ == MessageType.RemoteHostStarted:
-            print_(f"{self} - got confirmation from remote host, starting main loop")
-        else:
-            raise RuntimeError("expected RemoteHostStarted")
+        with self.status_ready_condvar:
+            if self.pair_socket.poll(5000):
+                data = self.pair_socket.recv()
+                msg = Message.from_bytes(data)
+                if msg.type_ == MessageType.RemoteHostStarted:
+                    print_(f"{self} - got confirmation from remote host, starting main loop")
+                    self.status_ready = True
+                else:
+                    self.status_ready = False
+                    print_(f"{self} - expected RemoteHostStarted! got {msg}")
+                self.status_ready_condvar.notify_all()
+            else:
+                self.status_ready = False
+                print_(f"{self} - timeout while waiting for RemoteHostStarted!")
+                self.status_ready_condvar.notify_all()
 
         # start main loop
 
@@ -61,7 +82,11 @@ class ProxyBroker:
             for sock in xlist:
                 print_(f"{self}: Error on socket: {sock}")
 
-    def run_host_proxy_thread(self):
+    def __str__(self) -> str:
+        return "ProxyBroker(plugin)"
+
+class ProxyHostBroker(ProxyBroker):
+    def run_proxy_thread(self):
         # first, notify proxy plugin
 
         print_(f"{self} - sending confirmation to remote plugin")
@@ -91,19 +116,8 @@ class ProxyBroker:
             for sock in xlist:
                 print_(f"{self}: Error on socket: {sock}")
 
-    def run_proxy_thread(self):
-        print_(f"{self}: Hello")
-
-        if self.is_proxy_plugin:
-            return self.run_plugin_proxy_thread()
-        else:
-            return self.run_host_proxy_thread()
-
     def __str__(self) -> str:
-        if self.is_proxy_plugin:
-            return "ProxyBroker(plugin)"
-        else:
-            return "ProxyBroker(host)"
+        return "ProxyBroker(host)"
 
 @dataclass
 class ProxyPluginInstance:
@@ -196,18 +210,8 @@ class ProxyPluginInstance:
         else:
             return f"ProxyPluginInstance(host, id={self.instance_id})"
 
-@dataclass
-class ProxyPlugin:
-    broker: ProxyBroker
-    effect_instances: list[ProxyPluginInstance]
 
-@dataclass
-class ProxyHost:
-    broker: ProxyBroker
-    effect_instances: list[ProxyPluginInstance]
-
-
-class MessageType(StrEnum):
+class MessageType(str, Enum):
     ActionDescribeStart = "ActionDescribeStart"
     ActionDescribeEnd = "ActionDescribeEnd"
     RemoteHostStarted = "RemoteHostStarted"

@@ -1,11 +1,8 @@
 import subprocess
-import sys
-from threading import Thread, Lock
-from time import sleep
-
+from threading import Thread, Lock, Condition
 import zmq
 
-from proxy_lib import ProxyBroker, ProxyPluginInstance, Message
+from proxy_lib import ProxyPluginBroker, ProxyPluginInstance, Message
 
 BROKER_PAIR_ADDRESS = "tcp://127.0.0.1"
 BROKER_PUB_ADDRESS = "inproc://plugin_broker_pub"
@@ -14,11 +11,12 @@ BROKER_SUB_ADDRESS = "inproc://plugin_broker_sub"
 class ProxyPlugin:
     def __init__(self, context: zmq.Context):
         self.context = context
-        self.proxy_broker = ProxyBroker(
+        self.proxy_broker = ProxyPluginBroker(
             pub_socket=context.socket(zmq.PUB),
             sub_socket=context.socket(zmq.SUB),
             pair_socket=context.socket(zmq.PAIR),
-            is_proxy_plugin=True
+            status_ready=None,
+            status_ready_condvar=Condition()
         )
         self.proxy_broker.pub_socket.bind(BROKER_PUB_ADDRESS)
         self.proxy_broker.sub_socket.bind(BROKER_SUB_ADDRESS)
@@ -46,6 +44,9 @@ class ProxyPlugin:
     def run(self):
         self.proxy_broker.run_proxy_thread()
 
+    def wait_for_status_ready(self):
+        return self.proxy_broker.wait_for_status_ready()
+
     def action_describe(self, parameters: str) -> str:
         global_instance_id = 0
         instance = self.proxy_effect_instances[global_instance_id]
@@ -53,10 +54,10 @@ class ProxyPlugin:
 
 def main():
     context = zmq.Context()
-    proxy_host = ProxyPlugin(context)
-    pair_address = proxy_host.pair_address
+    proxy_plugin = ProxyPlugin(context)
+    pair_address = proxy_plugin.pair_address
 
-    plugin_broker_thread = Thread(target=proxy_host.run)
+    plugin_broker_thread = Thread(target=proxy_plugin.run)
     plugin_broker_thread.start()
 
     cmd = ["python", "proxy_host.py", pair_address]
@@ -64,13 +65,16 @@ def main():
     p = subprocess.Popen(" ".join(cmd), shell=True)
 
     # ---------------------
-    # XXX issue: message sent before receiver is ready
-    print("XXX sleeping to make sure everything starts")
-    sleep(1)  # XXX use mutex?
+    print("Waiting for status ready")
+    status = proxy_plugin.wait_for_status_ready()
+    if not status:
+        print("Status is not OK, giving up")
+        # XXX kill remote process
+        return
 
     # test OFX host calling in serial
     print("OFX host: invoking describe action...")
-    rv = proxy_host.action_describe("describe params")  # host thread
+    rv = proxy_plugin.action_describe("describe params")  # host thread
     print("OFX host: describe action returned", rv)
 
 
