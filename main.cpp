@@ -7,12 +7,18 @@
 #include "OpenMfx/Sdk/Cpp/Host/MeshProps"
 #include "OpenMfx/Sdk/Cpp/Host/Mesh"
 #include "messages_generated.h"
+#include <zmq.hpp>
 
 int main() {
-    OpenMfx::Host host;
+  OpenMfx::Host host;
     OpenMfx::EffectRegistry& registry = OpenMfx::EffectRegistry::GetInstance();
     registry.setHost(&host);
     auto library = registry.getLibrary("./cmake-build-debug/OpenMfx/sdk/examples/c/plugins/OpenMfx_Example_C_Plugin_color_to_uv.ofx");
+
+    zmq::context_t ctx;
+    zmq::socket_t sock(ctx, zmq::socket_type::push);
+    sock.bind("inproc://test");
+    sock.send(zmq::str_buffer("Hello, world"), zmq::send_flags::dontwait);
 
     std::cout << "Hello, I see " << library->effectCount() << " effects" << std::endl;
     std::cout << "First effect is " << library->effectIdentifier(0) << std::endl;

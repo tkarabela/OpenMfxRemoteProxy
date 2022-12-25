@@ -2,3 +2,6 @@
 	path = OpenMfx
 	url = https://github.com/tkarabela/OpenMeshEffect
 	branch = OpenMfxRemoteProxy
+[submodule "vcpkg"]
+	path = vcpkg
+	url = https://github.com/Microsoft/vcpkg
