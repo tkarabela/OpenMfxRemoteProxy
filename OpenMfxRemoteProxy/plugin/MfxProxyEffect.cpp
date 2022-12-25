@@ -110,7 +110,7 @@ MfxProxyEffect::InstanceData *MfxProxyEffect::get_instance_data(OfxMeshEffectHan
     meshEffectSuite->getPropertySet(instance, &instance_props);
     InstanceData *data = nullptr;
     propertySuite->propGetPointer(instance_props, kOfxPropInstanceData, 0, (void**)&data);
-    return data
+    return data;
 }
 
 OfxStatus MfxProxyEffect::set_instance_data(OfxMeshEffectHandle instance, MfxProxyEffect::InstanceData *data) {

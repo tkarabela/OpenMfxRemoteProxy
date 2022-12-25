@@ -8,6 +8,7 @@ set(cppzmq_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-linux/share/cppz
 set(ZeroMQ_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-linux/share/zeromq")
 
 add_subdirectory(OpenMfx)
+add_subdirectory(OpenMfxRemoteProxy)
 
 project(untitled)
 
