@@ -39,6 +39,7 @@ OfxStatus MfxProxyEffect::Describe(OfxMeshEffectHandle descriptor) {
 
 OfxStatus MfxProxyEffect::CreateInstance(OfxMeshEffectHandle instance) {
     uint32_t instance_id = m_last_instance_id++;
+    MFX_ENSURE(set_instance_data(instance, new InstanceData { instance_id }));
 
     // TODO send ActionCreateInstanceStart
     // TODO receive ActionCreateInstanceEnd
@@ -47,6 +48,8 @@ OfxStatus MfxProxyEffect::CreateInstance(OfxMeshEffectHandle instance) {
 }
 
 OfxStatus MfxProxyEffect::DestroyInstance(OfxMeshEffectHandle instance) {
+    MFX_ENSURE(delete_instance_data(instance));
+
     // TODO send ActionDestroyInstanceStart
     // TODO receive ActionDestroyInstanceEnd
     return kOfxStatOK;
@@ -54,11 +57,15 @@ OfxStatus MfxProxyEffect::DestroyInstance(OfxMeshEffectHandle instance) {
 
 OfxStatus MfxProxyEffect::Cook(OfxMeshEffectHandle instance) {
     // TODO implement
+    auto instance_id = get_instance_data(instance)->instance_id;
+
     return kOfxStatOK;
 }
 
 OfxStatus MfxProxyEffect::IsIdentity(OfxMeshEffectHandle instance) {
     // TODO implement
+    auto instance_id = get_instance_data(instance)->instance_id;
+
     return kOfxStatReplyDefault;
 }
 
@@ -96,4 +103,28 @@ MfxProxyBroker& MfxProxyEffect::broker() {
 
 zmq::const_buffer MfxProxyEffect::message_prefix() const {
     return zmq::const_buffer { (void*)&m_effect_id, sizeof(m_effect_id) };
+}
+
+MfxProxyEffect::InstanceData *MfxProxyEffect::get_instance_data(OfxMeshEffectHandle instance) {
+    OfxPropertySetHandle instance_props;
+    meshEffectSuite->getPropertySet(instance, &instance_props);
+    InstanceData *data = nullptr;
+    propertySuite->propGetPointer(instance_props, kOfxPropInstanceData, 0, (void**)&data);
+    return data
+}
+
+OfxStatus MfxProxyEffect::set_instance_data(OfxMeshEffectHandle instance, MfxProxyEffect::InstanceData *data) {
+    OfxPropertySetHandle instance_props;
+    MFX_ENSURE(meshEffectSuite->getPropertySet(instance, &instance_props));
+    MFX_ENSURE(propertySuite->propSetPointer(instance_props, kOfxPropInstanceData, 0, data));
+    return kOfxStatOK;
+}
+
+OfxStatus MfxProxyEffect::delete_instance_data(OfxMeshEffectHandle instance) {
+    OfxPropertySetHandle instance_props;
+    MFX_ENSURE(meshEffectSuite->getPropertySet(instance, &instance_props));
+    InstanceData *instance_data = nullptr;
+    MFX_ENSURE(propertySuite->propGetPointer(instance_props, kOfxPropInstanceData, 0, (void**)&instance_data));
+    delete instance_data;
+    return kOfxStatOK;
 }

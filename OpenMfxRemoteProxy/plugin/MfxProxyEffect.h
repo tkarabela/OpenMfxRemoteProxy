@@ -23,6 +23,13 @@ public:
                         OfxPropertySetHandle inArgs,
                         OfxPropertySetHandle outArgs);
 
+    /**
+     * This is stored as kOfxPropInstanceData.
+     */
+    struct InstanceData {
+        uint32_t instance_id;
+    };
+
 protected:
     OfxStatus Load() override;
     OfxStatus Unload() override;
@@ -34,6 +41,10 @@ protected:
 
     static MfxProxyBroker& broker();
     zmq::const_buffer message_prefix() const;
+
+    InstanceData* get_instance_data(OfxMeshEffectHandle instance);
+    OfxStatus set_instance_data(OfxMeshEffectHandle instance, InstanceData *data);
+    OfxStatus delete_instance_data(OfxMeshEffectHandle instance);
 
 protected:
     uint32_t m_effect_id;
