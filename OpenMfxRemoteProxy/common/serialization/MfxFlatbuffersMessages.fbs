@@ -1,0 +1,107 @@
+/*
+This file defines serialization of OpenMfxRemoteProxy message protocol.
+*/
+
+include "MfxFlatbuffersBasicTypes.fbs";
+
+namespace OpenMfxRemoteProxy;
+
+table RemoteHostStarted {
+    number_of_plugins: int;
+    plugins: [OfxPlugin];
+}
+
+table ActionLoadStart {
+    // empty
+}
+
+table ActionLoadEnd {
+    status: OfxStatus;
+}
+
+table ActionUnloadStart {
+    // empty
+}
+
+table ActionUnloadEnd {
+    status: OfxStatus;
+}
+
+table ActionDescribeStart {
+    // empty
+}
+
+table ActionDescribeEnd {
+    status: OfxStatus;
+    inputs: [OfxMesh];
+    parameters: [OfxParameter];
+}
+
+table ActionCreateInstanceStart {
+    // empty
+}
+
+table ActionCreateInstanceEnd {
+    status: OfxStatus;
+    assigned_instance_id: EffectInstanceId;
+}
+
+table ActionDestroyInstanceStart {
+    instance_id: EffectInstanceId;
+}
+
+table ActionDestroyInstanceEnd {
+    status: OfxStatus;
+}
+
+table ActionIsIdentityStart {
+    instance_id: EffectInstanceId;
+    parameters: [OfxParameter];
+    in_args: [OfxProperty];
+}
+
+table ActionIsIdentityEnd {
+    status: OfxStatus;
+    out_args: [OfxProperty];
+}
+
+union Message {
+    // OpenMfxRemoteProxy internal messages
+    RemoteHostStarted,
+
+    // OFX action "Load"
+    ActionLoadStart,
+    ActionLoadEnd,
+
+    // OFX action "Unload"
+    ActionUnloadStart,
+    ActionUnloadEnd,
+
+    // OFX action "Describe"
+    ActionDescribeStart,
+    ActionDescribeEnd,
+
+    // OFX action "CreateInstance"
+    ActionCreateInstanceStart,
+    ActionCreateInstanceEnd,
+
+    // OFX action "DestroyInstance"
+    ActionDestroyInstanceStart,
+    ActionDestroyInstanceEnd,
+
+    // MFX action "IsIdentity"
+    ActionIsIdentityStart,
+    ActionIsIdentityEnd,
+
+    // MFX action "Cook"
+    // TODO
+    // TODO add intermittent messages for inputGetMesh, inputReleaseMesh ie. BeforeMeshGet, BeforeMeshRelease
+}
+
+// Note: plugin ID is prepended to the serialized data, for ZMQ subscription
+table MessageEnvelope {
+    message_thread_id: uint64;
+    message: Message;
+}
+
+root_type MessageEnvelope;

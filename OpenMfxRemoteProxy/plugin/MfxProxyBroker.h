@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zmq.hpp>
+#include <random>
 #include "OpenMfx/Sdk/Cpp/Plugin/MfxEffect"
 
 class MfxProxyBroker {
@@ -31,6 +32,9 @@ public:
         return "inproc://plugin_broker_sub";
     }
 
+    uint64_t generate_message_thread_id() {
+        return m_rng();
+    }
 
 private:
     MfxProxyBroker() = default;
@@ -40,6 +44,7 @@ private:
     zmq::socket_t m_pub_socket;
     zmq::socket_t m_sub_socket;
     zmq::socket_t m_pair_socket;
+    std::mt19937_64 m_rng;
 
     static MfxProxyBroker* INSTANCE;
 };

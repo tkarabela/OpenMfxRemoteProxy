@@ -1,0 +1,51 @@
+/*
+This file defines serialization for basic OFX/MFX datastructures.
+*/
+
+namespace OpenMfxRemoteProxy;
+
+struct OfxStatus { status: int; }
+
+table OfxPropertyIntNValue    { values: [int]; }     // contains 1-4 values
+table OfxPropertyFloatNValue  { values: [double]; }  // contains 1-4 values
+table OfxPropertyStringNValue { values: [string]; }  // contains 1-4 values
+table OfxPropertyPointerValue { buffer: [uint8]; }   // contains just 1 value (2,3,4 pointer properties unsupported)
+
+union OfxPropertyValue {
+    OfxPropertyIntNValue,
+    OfxPropertyFloatNValue,
+    OfxPropertyStringNValue,
+    OfxPropertyPointerValue
+}
+
+table OfxProperty {
+    name: string;
+    value: OfxPropertyValue;
+}
+
+// mesh attribute (eg. UV)
+table OfxAttribute {
+    properties: [OfxProperty];
+}
+
+// input/output geometry
+table OfxMesh {
+    properties: [OfxProperty];
+    attributes: [OfxAttribute];
+}
+
+// plugin parameter (user input, eg. a boolean toggle)
+table OfxParameter {
+    properties: [OfxProperty];
+}
+
+// a single plugin (effect)
+table OfxPlugin {
+    effect_id: int; // index of the effect
+    identifier: string;
+    version_major: int;
+    version_minor: int;
+}
+
+// OpenMfxRemoteProxy specific types
+struct EffectInstanceId { instance_id: uint32; }

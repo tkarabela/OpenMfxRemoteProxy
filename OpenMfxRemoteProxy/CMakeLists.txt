@@ -15,7 +15,8 @@ get_target_property(MFX_REMOTE_PROXY_FLATBUFFERS_INC
 )
 
 set(MFX_REMOTE_PROXY_FLATBUFFERS_SRC
-        common/serialization/openmfx_remote_proxy_messages.fbs
+        common/serialization/MfxFlatbuffersBasicTypes.fbs
+        common/serialization/MfxFlatbuffersMessages.fbs
 )
 
 flatbuffers_generate_headers(

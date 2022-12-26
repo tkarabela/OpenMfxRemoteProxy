@@ -6,7 +6,8 @@
 #include "OpenMfx/Sdk/Cpp/Host/Mesh"
 #include <zmq.hpp>
 #include <iostream>
-#include "openmfx_remote_proxy_messages_generated.h"
+#include "MfxFlatbuffersMessages_generated.h"
+#include "MfxFlatbuffersBasicTypes_generated.h"
 
 int main(int argc, char *argv[]) {
     std::cout << "Hello from remote_proxy_host\n";
