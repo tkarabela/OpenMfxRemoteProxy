@@ -12,5 +12,5 @@ git submodule update --init --recursive
 
 sudo apt-get install curl zip unzip tar
 ./vcpkg/bootstrap-vcpkg.sh
-./vcpkg/vcpkg install cppzmq
+./vcpkg/vcpkg install
 ```

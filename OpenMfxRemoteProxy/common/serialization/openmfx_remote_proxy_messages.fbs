@@ -1,0 +1,122 @@
+namespace OpenMfxRemoteProxy;
+
+// TODO make this a struct
+table OfxPropertyIntNValue    { values: [int]; }     // contains 1-4 values
+table OfxPropertyFloatNValue  { values: [double]; }  // contains 1-4 values
+table OfxPropertyStringNValue { values: [string]; }  // contains 1-4 values
+table OfxPropertyPointerValue { buffer: [uint8]; }   // contains just 1 value (2,3,4 pointer properties unsupported)
+
+union OfxPropertyValue {
+    OfxPropertyIntNValue,
+    OfxPropertyFloatNValue,
+    OfxPropertyStringNValue,
+    OfxPropertyPointerValue
+}
+
+table OfxProperty {
+    name: string;
+    value: OfxPropertyValue;
+}
+
+// mesh attribute (eg. UV)
+table OfxAttribute {
+    properties: [OfxProperty];
+}
+
+// input/output geometry
+table OfxMesh {
+    properties: [OfxProperty];
+    attributes: [OfxAttribute];
+}
+
+// plugin parameter (user input, eg. a boolean toggle)
+table OfxParameter {
+    properties: [OfxProperty];
+}
+
+// a single plugin (effect)
+table OfxPlugin {
+    identifier: string;
+    version_major: int;
+    version_minor: int;
+}
+
+// description of .ofx bundle with possibly multiple plugins (effects)
+table OfxBundle {
+    plugins: [OfxPlugin];
+}
+
+table OfxPluginDescription {
+    inputs: [OfxMesh];
+    parameters: [OfxParameter];
+}
+
+table OfxPluginWithDescription {
+    plugin: OfxPlugin;
+    description: OfxPluginDescription;
+}
+
+table RPDescribeRequest {
+
+}
+
+table RPDescribeResponse {
+    plugins: [OfxPluginWithDescription];
+}
+
+table RPCreateInstanceRequest {
+    plugin_identifier: string;
+}
+
+table RPCreateInstanceResponse {
+    instance_id: int;
+    ok: bool;
+}
+
+table RPDestroyInstanceRequest {
+    plugin_identifier: string;
+    instance_id: int;
+}
+
+table RPDestroyInstanceResponse {
+    ok: bool;
+}
+
+table RPActionIsIdentityRequest {
+    plugin_identifier: string;
+    instance_id: int;
+    parameters: [OfxParameter];
+    in_args: [OfxProperty];
+}
+
+table RPActionIsIdentityResponse {
+    status: string;
+    out_args: [OfxProperty];
+}
+
+
+table RPCookRequest {
+    plugin_identifier: string;
+    instance_id: int;
+    parameters: [OfxParameter];
+    inputs: [OfxMesh];
+    in_args: [OfxProperty];
+}
+
+// TODO add intermittent messages for inputGetMesh, inputReleaseMesh ie. BeforeMeshGet, BeforeMeshRelease
+
+table RPCookResponse {
+    status: string;
+    outputs: [OfxMesh];
+}
+
+union RPMessage {
+    RPDescribeRequest,
+    RPDescribeResponse
+}
+
+table RPMessageTable {
+    message: RPMessage;
+}
+
+root_type RPMessageTable;

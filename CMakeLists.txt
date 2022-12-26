@@ -4,10 +4,11 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems
         CACHE STRING "Vcpkg toolchain file")
 
 # XXX why is this needed?
-set(cppzmq_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-linux/share/cppzmq")
-set(ZeroMQ_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/x64-linux/share/zeromq")
+set(cppzmq_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed/x64-linux/share/cppzmq")
+set(ZeroMQ_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed/x64-linux/share/zeromq")
 
 add_subdirectory(OpenMfx)
+add_subdirectory(flatbuffers ${CMAKE_CURRENT_BINARY_DIR}/flatbuffers-build EXCLUDE_FROM_ALL)
 add_subdirectory(OpenMfxRemoteProxy)
 
 project(untitled)

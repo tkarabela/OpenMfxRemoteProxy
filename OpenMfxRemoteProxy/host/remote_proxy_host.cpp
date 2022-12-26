@@ -6,9 +6,14 @@
 #include "OpenMfx/Sdk/Cpp/Host/Mesh"
 #include <zmq.hpp>
 #include <iostream>
+#include "openmfx_remote_proxy_messages_generated.h"
 
 int main(int argc, char *argv[]) {
     std::cout << "Hello from remote_proxy_host\n";
+
+    flatbuffers::FlatBufferBuilder builder(1024);
+    auto plugin_name = builder.CreateString("foo");
+    std::vector<flatbuffers::Offset<OpenMfxRemoteProxy::OfxMesh>> inputs;
 
     OpenMfx::Host host;
     OpenMfx::EffectRegistry& registry = OpenMfx::EffectRegistry::GetInstance();

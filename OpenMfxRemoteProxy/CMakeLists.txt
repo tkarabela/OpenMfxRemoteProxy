@@ -1,10 +1,31 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(OpenMfxRemoteProxy)
+set(CMAKE_CXX_STANDARD 17)
 
 find_package(cppzmq CONFIG REQUIRED)
 
-set(CMAKE_CXX_STANDARD 17)
+
+# -----------------------------------------------------------------------------
+# OpenMfxRemoteProxy - flatbuffers
+# -----------------------------------------------------------------------------
+
+get_target_property(MFX_REMOTE_PROXY_FLATBUFFERS_INC
+        FlatBuffers INCLUDE_DIRECTORIES
+)
+
+set(MFX_REMOTE_PROXY_FLATBUFFERS_SRC
+        common/serialization/openmfx_remote_proxy_messages.fbs
+)
+
+flatbuffers_generate_headers(
+        TARGET OpenMfxRemoteProxy_Flatbuffers
+        SCHEMAS ${MFX_REMOTE_PROXY_FLATBUFFERS_SRC}
+)
+
+# -----------------------------------------------------------------------------
+# OpenMfxRemoteProxy - .ofx plugin
+# -----------------------------------------------------------------------------
 
 file(GLOB MFX_REMOTE_PROXY_PLUGIN_SRC
         common/*.cpp
@@ -13,8 +34,10 @@ file(GLOB MFX_REMOTE_PROXY_PLUGIN_SRC
 file(GLOB MFX_REMOTE_PROXY_PLUGIN_INC
         common
         plugin
+        ${MFX_REMOTE_PROXY_FLATBUFFERS_INC}
 )
 set(MFX_REMOTE_PROXY_PLUGIN_LIB
+        OpenMfxRemoteProxy_Flatbuffers
         cppzmq-static
         OpenMfx::Core
         OpenMfx::Sdk::Cpp::Common
@@ -29,7 +52,9 @@ set_target_properties(OpenMfxRemoteProxy_Plugin PROPERTIES SUFFIX ".ofx")
 set_property(TARGET OpenMfxRemoteProxy_Plugin PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 
-
+# -----------------------------------------------------------------------------
+# OpenMfxRemoteProxy - proxy host executable
+# -----------------------------------------------------------------------------
 
 file(GLOB MFX_REMOTE_PROXY_HOST_SRC
         common/*.cpp
@@ -38,8 +63,10 @@ file(GLOB MFX_REMOTE_PROXY_HOST_SRC
 file(GLOB MFX_REMOTE_PROXY_HOST_INC
         common
         host
+        ${MFX_REMOTE_PROXY_FLATBUFFERS_INC}
 )
 set(MFX_REMOTE_PROXY_HOST_LIB
+        OpenMfxRemoteProxy_Flatbuffers
         cppzmq-static
         OpenMfx::Core
         OpenMfx::Sdk::Cpp::Common
