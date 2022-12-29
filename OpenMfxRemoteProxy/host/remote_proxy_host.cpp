@@ -10,21 +10,20 @@
 #include "MfxFlatbuffersBasicTypes_generated.h"
 
 int main(int argc, char *argv[]) {
-    std::cout << "Hello from remote_proxy_host\n";
+    if (argc != 3) {
+        std::cout << "Usage: remote_proxy_host plugin.ofx tcp://127.0.0.1:12345\n";
+        return 1;
+    }
 
-    flatbuffers::FlatBufferBuilder builder(1024);
-    auto plugin_name = builder.CreateString("foo");
-    std::vector<flatbuffers::Offset<OpenMfxRemoteProxy::OfxMesh>> inputs;
+    auto plugin_path = argv[1];
+    auto pair_address = argv[2];
+
+    std::cout << "Hello from remote_proxy_host\n";
 
     OpenMfx::Host host;
     OpenMfx::EffectRegistry& registry = OpenMfx::EffectRegistry::GetInstance();
     registry.setHost(&host);
-    auto library = registry.getLibrary("./cmake-build-debug/OpenMfx/sdk/examples/c/plugins/OpenMfx_Example_C_Plugin_color_to_uv.ofx");
-
-    zmq::context_t ctx;
-    zmq::socket_t sock(ctx, zmq::socket_type::push);
-    sock.bind("inproc://test");
-    sock.send(zmq::str_buffer("Hello, world"), zmq::send_flags::dontwait);
+    auto library = registry.getLibrary(plugin_path);
 
     return 0;
 }

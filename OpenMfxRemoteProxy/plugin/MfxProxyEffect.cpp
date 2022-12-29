@@ -4,13 +4,13 @@
 #include "MfxFlatbuffersBasicTypes_generated.h"
 #include <cassert>
 
-MfxProxyEffect::MfxProxyEffect(int effect_id)
-: m_effect_id(effect_id) {
+MfxProxyEffect::MfxProxyEffect(int effect_id, MfxProxyPluginBroker *broker)
+: m_effect_id(effect_id), m_broker(broker) {
 }
 
 OfxStatus MfxProxyEffect::Load() {
     {
-        DEBUG_LOG << "[MfxProxyEffect] Effect " << GetName() << " connects to broker";
+        DEBUG_LOG << "[MfxProxyEffect] Effect " << GetName() << " connects to m_broker";
     }
 
     m_pub_socket = zmq::socket_t(broker().ctx(), zmq::socket_type::pub);
@@ -71,7 +71,7 @@ OfxStatus MfxProxyEffect::Unload() {
     assert(action); // check message type
 
     {
-        DEBUG_LOG << "[MfxProxyEffect] Effect " << GetName() << " disconnects from broker";
+        DEBUG_LOG << "[MfxProxyEffect] Effect " << GetName() << " disconnects from m_broker";
     }
 
     m_pub_socket.close();
@@ -223,8 +223,8 @@ OfxStatus MfxProxyEffect::MainEntry(const char *action,
     return status;
 }
 
-MfxProxyBroker& MfxProxyEffect::broker() {
-    return MfxProxyBroker::instance();
+MfxProxyPluginBroker& MfxProxyEffect::broker() {
+    return *m_broker;
 }
 
 zmq::const_buffer MfxProxyEffect::message_prefix() const {
@@ -326,4 +326,20 @@ OfxStatus MfxProxyEffect::prop_set_from_flatbuffer(OfxPropertySetHandle ofx_para
     }
 
     return kOfxStatOK;
+}
+
+MfxProxyEffect::MfxProxyEffect(MfxProxyEffect &&other) noexcept
+: m_effect_id(other.m_effect_id),
+  m_pub_socket(std::move(other.m_pub_socket)),
+  m_sub_socket(std::move(other.m_sub_socket)),
+  m_effect_lock(),
+  m_broker(other.m_broker) {
+}
+
+const char *MfxProxyEffect::GetName() {
+    return m_identifier.c_str();
+}
+
+void MfxProxyEffect::SetName(const char *identifier) {
+    m_identifier = std::string(identifier);
 }

@@ -2,7 +2,7 @@
 
 #include <mutex>
 #include "OpenMfx/Sdk/Cpp/Plugin/MfxEffect"
-#include "MfxProxyBroker.h"
+#include "MfxProxyPluginBroker.h"
 #include "flatbuffers/flatbuffer_builder.h"
 #include "MfxFlatbuffersMessages_generated.h"
 
@@ -24,7 +24,8 @@ private:
 
 class MfxProxyEffect : public MfxEffect {
 public:
-    explicit MfxProxyEffect(int effect_id);
+    MfxProxyEffect(int effect_id, MfxProxyPluginBroker *broker);
+    MfxProxyEffect(MfxProxyEffect&& other) noexcept;
 
     /**
      * A locking version of MfxEffect::MainEntry() that locks on m_effect_lock.
@@ -40,6 +41,8 @@ public:
                         const void *handle,
                         OfxPropertySetHandle inArgs,
                         OfxPropertySetHandle outArgs);
+
+    void SetName(const char* identifier);
 
     /**
      * This is stored as kOfxPropInstanceData.
@@ -57,7 +60,8 @@ protected:
     OfxStatus Cook(OfxMeshEffectHandle instance) override;
     OfxStatus IsIdentity(OfxMeshEffectHandle instance) override;
 
-    static MfxProxyBroker& broker();
+    const char *GetName() override;
+    MfxProxyPluginBroker& broker();
     zmq::const_buffer message_prefix() const;
 
     InstanceData* get_instance_data(OfxMeshEffectHandle instance);
@@ -74,4 +78,6 @@ protected:
     zmq::socket_t m_pub_socket;
     zmq::socket_t m_sub_socket;
     std::mutex m_effect_lock;
+    MfxProxyPluginBroker *m_broker;
+    std::string m_identifier;
 };
