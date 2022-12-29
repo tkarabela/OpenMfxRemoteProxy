@@ -33,7 +33,7 @@ set(LIB
         OpenMfx::Sdk::Cpp::Plugin
         )
 
-add_executable(untitled main.cpp OpenMfxRemoteProxy/plugin/MfxProxyPluginBroker.cpp OpenMfxRemoteProxy/plugin/MfxProxyPluginBroker.h OpenMfxRemoteProxy/plugin/remote_proxy_plugin.cpp OpenMfxRemoteProxy/plugin/MfxProxyEffect.h OpenMfxRemoteProxy/plugin/MfxProxyEffect.cpp)
+add_executable(untitled main.cpp OpenMfxRemoteProxy/plugin/MfxProxyPluginBroker.cpp OpenMfxRemoteProxy/plugin/MfxProxyPluginBroker.h OpenMfxRemoteProxy/plugin/remote_proxy_plugin.cpp OpenMfxRemoteProxy/plugin/MfxProxyEffect.h OpenMfxRemoteProxy/plugin/MfxProxyEffect.cpp OpenMfxRemoteProxy/host/MfxProxyHost.h)
 target_include_directories(untitled PRIVATE ${INC})
 target_link_libraries(untitled PRIVATE ${LIB})
 target_link_libraries(untitled PRIVATE cppzmq-static)

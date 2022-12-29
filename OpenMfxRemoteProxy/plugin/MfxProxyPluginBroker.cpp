@@ -58,7 +58,46 @@ void MfxProxyPluginBroker::broker_thread_main() {
         }
     }
 
-    // TODO main loop
+    // main loop
+    zmq::poller_t<BrokerSocket> poller;
+    auto sub_socket_enum = BrokerSocket::sub;
+    auto pair_socket_enum = BrokerSocket::pair;
+    poller.add(m_pair_socket, zmq::event_flags::pollin, &pair_socket_enum);
+    poller.add(m_sub_socket, zmq::event_flags::pollin, &sub_socket_enum);
+
+    std::vector<zmq::poller_event<BrokerSocket>> events(2);
+
+    while (true) {
+        auto n = poller.wait_all(events, 60000ms);
+        if (!n) continue;
+
+        for (int i = 0; i < n; i++) {
+            auto socket_enum = *events[i].user_data;
+            DEBUG_LOG << "[MfxProxyPlugin] Broker got message from socket " << broker_socket_to_string(socket_enum);
+            zmq::message_t msg;
+            events[i].socket.recv(msg, zmq::recv_flags::none);
+
+            switch (socket_enum) {
+                case BrokerSocket::pair:
+                {
+                    DEBUG_LOG << "[MfxProxyPlugin] Forwarding message to socket SUB";
+                    m_sub_socket.send(std::move(msg), zmq::send_flags::none);
+                    break;
+                }
+                case BrokerSocket::sub:
+                {
+                    DEBUG_LOG << "[MfxProxyPlugin] Forwarding message to socket PAIR";
+                    m_pair_socket.send(std::move(msg), zmq::send_flags::none);
+                    break;
+                }
+                default:
+                {
+                    ERR_LOG << "[MfxProxyPlugin] unexpected broker socket!";
+                    assert(0);
+                }
+            }
+        }
+    }
 }
 
 const MfxProxyPluginBroker::BrokerPluginBundleDefinition *MfxProxyPluginBroker::get_plugin_definition() {

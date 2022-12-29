@@ -5,9 +5,12 @@
 
 class MfxProxyBroker {
 public:
+    enum class BrokerSocket { pub, sub, pair };
+
     MfxProxyBroker();
     MfxProxyBroker(const MfxProxyBroker&) = delete;
     MfxProxyBroker& operator=(const MfxProxyBroker&) = delete;
+    virtual ~MfxProxyBroker() = default;
 
     zmq::context_t& ctx() {
         return m_ctx;
@@ -18,6 +21,7 @@ public:
 
     virtual void broker_thread_main() = 0;
     void start_thread();
+    void join_thread();
 
 protected:
     zmq::context_t m_ctx;
@@ -26,3 +30,11 @@ protected:
     zmq::socket_t m_pair_socket;
     std::thread m_thread;
 };
+
+constexpr const char* broker_socket_to_string(MfxProxyBroker::BrokerSocket e) noexcept {
+    switch (e) {
+        case MfxProxyBroker::BrokerSocket::pub: return "PUB";
+        case MfxProxyBroker::BrokerSocket::sub: return "SUB";
+        case MfxProxyBroker::BrokerSocket::pair: return "PAIR";
+    }
+}

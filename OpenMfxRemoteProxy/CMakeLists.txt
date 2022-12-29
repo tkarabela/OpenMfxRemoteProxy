@@ -4,6 +4,7 @@ project(OpenMfxRemoteProxy)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(cppzmq CONFIG REQUIRED)
+add_definitions(-DZMQ_BUILD_DRAFT_API)  # https://github.com/zeromq/cppzmq/issues/175#issuecomment-903966668
 
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.74 REQUIRED)
@@ -33,7 +34,9 @@ flatbuffers_generate_headers(
 
 file(GLOB MFX_REMOTE_PROXY_PLUGIN_SRC
         common/*.cpp
+        common/*.h
         plugin/*.cpp
+        plugin/*.h
 )
 file(GLOB MFX_REMOTE_PROXY_PLUGIN_INC
         common
@@ -64,7 +67,9 @@ set_property(TARGET OpenMfxRemoteProxy_Plugin PROPERTY POSITION_INDEPENDENT_CODE
 
 file(GLOB MFX_REMOTE_PROXY_HOST_SRC
         common/*.cpp
+        common/*.h
         host/*.cpp
+        host/*.h
 )
 file(GLOB MFX_REMOTE_PROXY_HOST_INC
         common
@@ -83,6 +88,7 @@ set(MFX_REMOTE_PROXY_HOST_LIB
 add_executable(OpenMfxRemoteProxy_Host ${MFX_REMOTE_PROXY_HOST_SRC})
 target_include_directories(OpenMfxRemoteProxy_Host PRIVATE ${MFX_REMOTE_PROXY_HOST_INC})
 target_link_libraries(OpenMfxRemoteProxy_Host PRIVATE ${MFX_REMOTE_PROXY_HOST_LIB})
+add_dependencies(OpenMfxRemoteProxy_Plugin OpenMfxRemoteProxy_Host)
 
 # -----------------------------------------------------------------------------
 # OpenMfxRemoteProxy - dummy host for testing
@@ -97,3 +103,4 @@ set(MFX_REMOTE_PROXY_DUMMY_HOST_LIB
 
 add_executable(OpenMfxRemoteProxy_DummyHost ./test/dummy_host.cpp)
 target_link_libraries(OpenMfxRemoteProxy_DummyHost PRIVATE ${MFX_REMOTE_PROXY_DUMMY_HOST_LIB})
+add_dependencies(OpenMfxRemoteProxy_DummyHost OpenMfxRemoteProxy_Plugin OpenMfxRemoteProxy_Host)

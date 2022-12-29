@@ -6,6 +6,7 @@
 #include <mutex>
 #include "OpenMfx/Sdk/Cpp/Plugin/MfxEffect"
 #include "MfxProxyBroker.h"
+//#include "OpenMfxRemoteProxy/common/MfxProxyBroker.h"
 
 class MfxProxyPluginBroker : public MfxProxyBroker {
 public:
@@ -26,6 +27,8 @@ public:
     OfxStatus OfxSetHost(const OfxHost* host);
     int OfxGetNumberOfPlugins();
     OfxPlugin* OfxGetPlugin(int nth);
+
+    virtual ~MfxProxyPluginBroker() = default;
 
     const char * pub_address() const override {
         return "inproc://plugin_broker_pub";

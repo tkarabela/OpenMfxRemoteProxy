@@ -8,6 +8,7 @@
 #include <iostream>
 #include "MfxFlatbuffersMessages_generated.h"
 #include "MfxFlatbuffersBasicTypes_generated.h"
+#include "MfxProxyHost.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
@@ -18,12 +19,23 @@ int main(int argc, char *argv[]) {
     auto plugin_path = argv[1];
     auto pair_address = argv[2];
 
-    std::cout << "Hello from remote_proxy_host\n";
+    {
+        LOG << "[MfxProxyHost] Hello from remote_proxy_host";
+    }
 
-    OpenMfx::Host host;
-    OpenMfx::EffectRegistry& registry = OpenMfx::EffectRegistry::GetInstance();
-    registry.setHost(&host);
-    auto library = registry.getLibrary(plugin_path);
+    try {
+        MfxProxyHost host;
+        host.set_remote_plugin_pair_address(pair_address);
+        host.set_plugin(plugin_path);
+        host.run_main_loop();
+    } catch (std::exception &err) {
+        ERR_LOG << "[MfxProxyHost] Terminating due to unexpected error: " << err.what();
+        return 1;
+    }
+
+    {
+        LOG << "[MfxProxyHost] Finished, exiting";
+    }
 
     return 0;
 }

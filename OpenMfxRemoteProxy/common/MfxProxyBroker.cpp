@@ -10,3 +10,7 @@ MfxProxyBroker::MfxProxyBroker()
 void MfxProxyBroker::start_thread() {
     m_thread = std::thread(&MfxProxyBroker::broker_thread_main, this);
 }
+
+void MfxProxyBroker::join_thread() {
+    m_thread.join();
+}
