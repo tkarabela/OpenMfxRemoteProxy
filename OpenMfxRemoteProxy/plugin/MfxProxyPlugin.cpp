@@ -3,7 +3,7 @@
 #include <fstream>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
-//#include <boost/filesystem.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/process.hpp>
 
 
@@ -61,20 +61,18 @@ OfxStatus MfxProxyPlugin::OfxSetHost(const OfxHost *host, const char *bundle_dir
     m_broker.start_thread();
 
     // read configuration file
-//    auto bundle_dir_path = boost::filesystem::path(bundle_dir);
-//    auto config_path = bundle_dir_path / "OpenMfxRemoteProxy.ini";
-//    if (!boost::filesystem::exists(config_path)) {
-//        ERR_LOG << "[MfxProxyEffect] Missing config file: " << config_path;
-//        return kOfxStatFailed;
-//    }
+    auto bundle_dir_path = boost::filesystem::path(bundle_dir);
+    auto config_path = bundle_dir_path / "OpenMfxRemoteProxy.ini";
+    if (!boost::filesystem::exists(config_path)) {
+        ERR_LOG << "[MfxProxyEffect] Missing config file: " << config_path;
+        return kOfxStatFailed;
+    }
 
-    auto bundle_dir_path = std::string(bundle_dir);
-    auto config_path = bundle_dir_path + "/OpenMfxRemoteProxy.ini";
 
     boost::property_tree::ptree config_tree;
     std::string plugin_path;
     try {
-        boost::property_tree::read_ini(config_path, config_tree);
+        boost::property_tree::read_ini(config_path.c_str(), config_tree);
         plugin_path = config_tree.get<std::string>("plugin_path");
     } catch (std::runtime_error &err) {
         ERR_LOG << "[MfxProxyEffect] Failed when reading config file: " << config_path << " - " << err.what();
@@ -83,15 +81,15 @@ OfxStatus MfxProxyPlugin::OfxSetHost(const OfxHost *host, const char *bundle_dir
 
     // find proxy host binary
     #if defined(WIN32) || defined(WIN64)
-    std::string proxy_host_path = bundle_dir_path + "/OpenMfxRemoteProxy_Host.exe";
+    boost::filesystem::path proxy_host_path = bundle_dir_path / "OpenMfxRemoteProxy_Host.exe";
     #else
-    std::string proxy_host_path = bundle_dir_path + "/OpenMfxRemoteProxy_Host";
+    boost::filesystem::path proxy_host_path = bundle_dir_path / "OpenMfxRemoteProxy_Host";
     #endif
 
-//    if (!boost::filesystem::exists(proxy_host_path)) {
-//        ERR_LOG << "[MfxProxyEffect] Missing proxy host runner binary: " << proxy_host_path;
-//        return kOfxStatFailed;
-//    }
+    if (!boost::filesystem::exists(proxy_host_path)) {
+        ERR_LOG << "[MfxProxyEffect] Missing proxy host runner binary: " << proxy_host_path;
+        return kOfxStatFailed;
+    }
 
     // launch subprocess
     {

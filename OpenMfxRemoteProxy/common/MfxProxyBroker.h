@@ -42,4 +42,5 @@ constexpr const char* broker_socket_to_string(MfxProxyBroker::BrokerSocket e) no
         case MfxProxyBroker::BrokerSocket::sub: return "SUB";
         case MfxProxyBroker::BrokerSocket::pair: return "PAIR";
     }
+    return "";
 }

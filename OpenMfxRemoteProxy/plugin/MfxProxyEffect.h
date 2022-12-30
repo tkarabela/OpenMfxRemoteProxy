@@ -69,7 +69,7 @@ protected:
     OfxStatus delete_instance_data(OfxMeshEffectHandle instance);
 
     void send_message(MfxProxyMessage&& message);
-    MfxProxyMessage&& receive_message();
+    MfxProxyMessage receive_message();
 
     OfxStatus prop_set_from_flatbuffer(OfxPropertySetHandle ofx_param_props, const OpenMfxRemoteProxy::OfxProperty* property);
 

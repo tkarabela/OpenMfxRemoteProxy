@@ -6,7 +6,7 @@ find_package(cppzmq CONFIG REQUIRED)
 add_definitions(-DZMQ_BUILD_DRAFT_API)  # https://github.com/zeromq/cppzmq/issues/175#issuecomment-903966668
 
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.74 REQUIRED)
+find_package(Boost 1.74 REQUIRED COMPONENTS filesystem)
 
 
 # -----------------------------------------------------------------------------
@@ -45,6 +45,7 @@ set(MFX_REMOTE_PROXY_PLUGIN_LIB
         OpenMfxRemoteProxy_Flatbuffers
         cppzmq-static
         Boost::boost
+        Boost::filesystem
         OpenMfx::Core
         OpenMfx::Sdk::Cpp::Common
         OpenMfx::Sdk::Cpp::Host

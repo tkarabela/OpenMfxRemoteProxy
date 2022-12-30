@@ -298,7 +298,7 @@ void MfxProxyEffect::send_message(MfxProxyMessage &&message) {
     auto res = m_pub_socket.send(message.move_msg(), zmq::send_flags::none);
 }
 
-MfxProxyMessage &&MfxProxyEffect::receive_message() {
+MfxProxyMessage MfxProxyEffect::receive_message() {
     zmq::message_t message;
     auto res = m_sub_socket.recv(message, zmq::recv_flags::none);
 
@@ -312,5 +312,5 @@ MfxProxyMessage &&MfxProxyEffect::receive_message() {
 
     assert(message_.effect_id() == m_effect_id);
 
-    return std::move(message_);
+    return message_;
 }
