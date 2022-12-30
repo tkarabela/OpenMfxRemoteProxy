@@ -1,6 +1,5 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.22)
 
-project(OpenMfxRemoteProxy)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(cppzmq CONFIG REQUIRED)
@@ -18,9 +17,8 @@ get_target_property(MFX_REMOTE_PROXY_FLATBUFFERS_INC
         FlatBuffers INCLUDE_DIRECTORIES
 )
 
-set(MFX_REMOTE_PROXY_FLATBUFFERS_SRC
-        common/serialization/MfxFlatbuffersBasicTypes.fbs
-        common/serialization/MfxFlatbuffersMessages.fbs
+file(GLOB MFX_REMOTE_PROXY_FLATBUFFERS_SRC
+        common/serialization/*.fbs
 )
 
 flatbuffers_generate_headers(
