@@ -10,7 +10,7 @@ MfxProxyEffect::MfxProxyEffect(int effect_id, MfxProxyPluginBroker *broker)
 
 OfxStatus MfxProxyEffect::Load() {
     {
-        DEBUG_LOG << "[MfxProxyEffect] Effect " << GetName() << " connects to m_broker";
+        DEBUG_LOG << "[MfxProxyEffect] Effect " << GetName() << " (effect_id=" << m_effect_id << ") connects to m_broker";
     }
 
     m_pub_socket = zmq::socket_t(broker().ctx(), zmq::socket_type::pub);
@@ -20,9 +20,8 @@ OfxStatus MfxProxyEffect::Load() {
     m_sub_socket.connect(broker().pub_address());
     m_sub_socket.set(zmq::sockopt::subscribe, message_prefix());
 
-    // Since these sockets are using `inproc` transport, we assume they
-    // connect instantaneously, and there is no confirmation mechanism
-    // like with `RemoteHostStarted`.
+    // TODO wait for explicit confirmation from broker that connection works
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // XXX this is bad :(
 
     auto message_thread_id = broker().generate_message_thread_id();
 
@@ -30,20 +29,13 @@ OfxStatus MfxProxyEffect::Load() {
     {
         flatbuffers::FlatBufferBuilder fbb;
         auto message = OpenMfxRemoteProxy::CreateActionLoadStart(fbb);
-        auto message_envelope = OpenMfxRemoteProxy::CreateMessageEnvelope(
-                fbb,
-                message_thread_id,
-                OpenMfxRemoteProxy::Message::Message_ActionLoadStart,
-                message.Union());
-
-        fbb.Finish(message_envelope);
-        send_flatbuffer(fbb, message_thread_id);
+        auto message_ = MfxProxyMessage::make_message(fbb, message, m_effect_id, message_thread_id, 0);
+        send_message(std::move(message_));
     }
 
     // receive ActionLoadEnd
-    auto msg = receive_flatbuffer(message_thread_id);
-    auto action = msg.message_envelope()->message_as_ActionLoadEnd();
-    assert(action); // check message type
+    auto message_ = receive_message();
+    auto action = message_.message_as<OpenMfxRemoteProxy::ActionLoadEnd>();
 
     return action->status()->status(); // return remote status
 }
@@ -55,20 +47,13 @@ OfxStatus MfxProxyEffect::Unload() {
     {
         flatbuffers::FlatBufferBuilder fbb;
         auto message = OpenMfxRemoteProxy::CreateActionUnloadStart(fbb);
-        auto message_envelope = OpenMfxRemoteProxy::CreateMessageEnvelope(
-                fbb,
-                message_thread_id,
-                OpenMfxRemoteProxy::Message::Message_ActionUnloadStart,
-                message.Union());
-
-        fbb.Finish(message_envelope);
-        send_flatbuffer(fbb, message_thread_id);
+        auto message_ = MfxProxyMessage::make_message(fbb, message, m_effect_id, message_thread_id, 0);
+        send_message(std::move(message_));
     }
 
     // receive ActionUnloadEnd
-    auto msg = receive_flatbuffer(message_thread_id);
-    auto action = msg.message_envelope()->message_as_ActionUnloadEnd();
-    assert(action); // check message type
+    auto message_ = receive_message();
+    auto action = message_.message_as<OpenMfxRemoteProxy::ActionUnloadEnd>();
 
     {
         DEBUG_LOG << "[MfxProxyEffect] Effect " << GetName() << " disconnects from m_broker";
@@ -87,20 +72,13 @@ OfxStatus MfxProxyEffect::Describe(OfxMeshEffectHandle descriptor) {
     {
         flatbuffers::FlatBufferBuilder fbb;
         auto message = OpenMfxRemoteProxy::CreateActionDescribeStart(fbb);
-        auto message_envelope = OpenMfxRemoteProxy::CreateMessageEnvelope(
-                fbb,
-                message_thread_id,
-                OpenMfxRemoteProxy::Message::Message_ActionDescribeStart,
-                message.Union());
-
-        fbb.Finish(message_envelope);
-        send_flatbuffer(fbb, message_thread_id);
+        auto message_ = MfxProxyMessage::make_message(fbb, message, m_effect_id, message_thread_id, 0);
+        send_message(std::move(message_));
     }
 
     // receive ActionDescribeEnd
-    auto msg = receive_flatbuffer(message_thread_id);
-    auto action = msg.message_envelope()->message_as_ActionDescribeEnd();
-    assert(action); // check message type
+    auto message_ = receive_message();
+    auto action = message_.message_as<OpenMfxRemoteProxy::ActionDescribeEnd>();
     MFX_ENSURE(action->status()->status()); // check that remote status was OK
 
     // replay received parameters
@@ -255,40 +233,6 @@ OfxStatus MfxProxyEffect::delete_instance_data(OfxMeshEffectHandle instance) {
     return kOfxStatOK;
 }
 
-void MfxProxyEffect::send_flatbuffer(flatbuffers::FlatBufferBuilder &fbb, uint64_t message_thread_id) {
-    uint8_t *buf = fbb.GetBufferPointer();
-    auto bufsize = fbb.GetSize();
-    assert(bufsize > 0);
-
-    // we copy the data here, which is suboptimal
-
-    zmq::message_t msg(sizeof(m_effect_id) + bufsize);
-    memcpy(msg.data(),
-           &m_effect_id,
-           sizeof(m_effect_id));
-    memcpy(msg.data<uint8_t>() + sizeof(m_effect_id),
-           buf,
-           bufsize);
-
-    DEBUG_LOG << "[MfxProxyEffect] Message thread " << message_thread_id << " sends message";
-
-    auto res = m_pub_socket.send(std::move(msg), zmq::send_flags::none);
-}
-
-FlatbufferRecvMessage MfxProxyEffect::receive_flatbuffer(uint64_t message_thread_id) {
-    zmq::message_t msg;
-    auto res = m_sub_socket.recv(msg);
-
-    FlatbufferRecvMessage msg_(std::move(msg));
-
-    DEBUG_LOG << "[MfxProxyEffect] Message thread " << msg_.message_envelope()->message_thread_id() << " got message " << EnumNameMessage(msg_.message_envelope()->message_type());
-
-    assert(msg_.message_effect_id() == m_effect_id);
-    assert(msg_.message_envelope()->message_thread_id() == message_thread_id);
-
-    return msg_;
-}
-
 OfxStatus MfxProxyEffect::prop_set_from_flatbuffer(OfxPropertySetHandle ofx_param_props,
                                                    const OpenMfxRemoteProxy::OfxProperty *property) {
     auto propName = property->name()->c_str();
@@ -342,4 +286,31 @@ const char *MfxProxyEffect::GetName() {
 
 void MfxProxyEffect::SetName(const char *identifier) {
     m_identifier = std::string(identifier);
+}
+
+void MfxProxyEffect::send_message(MfxProxyMessage &&message) {
+    DEBUG_LOG << "[MfxProxyEffect]"
+              << " Sending message " << OpenMfxRemoteProxy::EnumNameMessage(message.message_type()) << " to PUB:"
+              << " message_id=" << message.message_id()
+              << " message_thread_id=" << message.message_thread_id()
+              << " effect_id=" << m_effect_id;
+
+    auto res = m_pub_socket.send(message.move_msg(), zmq::send_flags::none);
+}
+
+MfxProxyMessage &&MfxProxyEffect::receive_message() {
+    zmq::message_t message;
+    auto res = m_sub_socket.recv(message, zmq::recv_flags::none);
+
+    auto message_ = MfxProxyMessage(std::move(message));
+
+    DEBUG_LOG << "[MfxProxyEffect]"
+              << " Received message " << OpenMfxRemoteProxy::EnumNameMessage(message_.message_type()) << " to PUB:"
+              << " message_id=" << message_.message_id()
+              << " message_thread_id=" << message_.message_thread_id()
+              << " effect_id=" << message_.effect_id();
+
+    assert(message_.effect_id() == m_effect_id);
+
+    return std::move(message_);
 }

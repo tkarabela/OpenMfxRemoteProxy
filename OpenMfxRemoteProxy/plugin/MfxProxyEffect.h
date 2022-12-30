@@ -68,8 +68,8 @@ protected:
     OfxStatus set_instance_data(OfxMeshEffectHandle instance, InstanceData *data);
     OfxStatus delete_instance_data(OfxMeshEffectHandle instance);
 
-    void send_flatbuffer(flatbuffers::FlatBufferBuilder &fbb, uint64_t message_thread_id);
-    FlatbufferRecvMessage receive_flatbuffer(uint64_t message_thread_id);
+    void send_message(MfxProxyMessage&& message);
+    MfxProxyMessage&& receive_message();
 
     OfxStatus prop_set_from_flatbuffer(OfxPropertySetHandle ofx_param_props, const OpenMfxRemoteProxy::OfxProperty* property);
 

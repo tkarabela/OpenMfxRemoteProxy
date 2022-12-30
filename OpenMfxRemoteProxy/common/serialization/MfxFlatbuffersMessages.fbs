@@ -100,7 +100,8 @@ union Message {
 
 // Note: plugin ID is prepended to the serialized data, for ZMQ subscription
 table MessageEnvelope {
-    message_thread_id: uint64;
+    message_thread_id: uint32;
+    message_id: uint32;
     message: Message;
 }
 

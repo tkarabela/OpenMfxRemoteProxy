@@ -5,6 +5,7 @@
 #include "MfxFlatbuffersMessages_generated.h"
 #include "MfxFlatbuffersBasicTypes_generated.h"
 #include "zmq.hpp"
+#include "MfxProxyMessage.h"
 #include <chrono>
 using namespace std::chrono_literals;
 
@@ -23,7 +24,6 @@ void MfxProxyHostBroker::broker_thread_main() {
 
     // send RemoteHostStarted
     {
-        uint64_t message_thread_id = 0;
         flatbuffers::FlatBufferBuilder fbb;
 
         auto plugins = std::vector<flatbuffers::Offset<OpenMfxRemoteProxy::OfxPlugin>>();
@@ -39,17 +39,9 @@ void MfxProxyHostBroker::broker_thread_main() {
         }
 
         auto message = OpenMfxRemoteProxy::CreateRemoteHostStartedDirect(fbb, (int)plugins.size(), &plugins);
-        auto message_envelope = OpenMfxRemoteProxy::CreateMessageEnvelope(
-                fbb,
-                message_thread_id,
-                OpenMfxRemoteProxy::Message::Message_RemoteHostStarted,
-                message.Union());
 
-        fbb.Finish(message_envelope);
-        {
-            DEBUG_LOG << "[MfxProxyHost] Sending RemoteHostStarted message";
-        }
-        send_flatbuffer_remote(fbb, message_thread_id);
+        auto message_ = MfxProxyMessage::make_message(fbb, message, 0, 0, 0);
+        send_message_pair(std::move(message_));
     }
 
     // main loop
@@ -66,9 +58,18 @@ void MfxProxyHostBroker::broker_thread_main() {
         if (!n) continue;
 
         for (int i = 0; i < n; i++) {
-            DEBUG_LOG << "[MfxProxyHost] Broker got message from socket " << broker_socket_to_string(*events[i].user_data);
-            zmq::message_t msg;
-            auto rres = events[i].socket.recv(msg, zmq::recv_flags::none);
+            auto socket_enum = *events[i].user_data;
+            zmq::message_t message;
+            auto res = events[i].socket.recv(message, zmq::recv_flags::none);
+            MfxProxyMessage message_(std::move(message));
+
+            DEBUG_LOG << "[" << broker_name() << "]"
+                      << " Received message " << OpenMfxRemoteProxy::EnumNameMessage(message_.message_type())
+                      << " from " << broker_socket_to_string(socket_enum) << ":"
+                      << " message_id=" << message_.message_id()
+                      << " message_thread_id=" << message_.message_thread_id()
+                      << " effect_id=" << message_.effect_id();
+
             // TODO handle the message
         }
     }
@@ -78,14 +79,14 @@ void MfxProxyHostBroker::setup_sockets(const char *pair_address) {
     m_pair_address = pair_address;
 
     m_pub_socket.bind(pub_address());
-    LOG << "[MfxProxyHost] Broker PUB socket bind to " << m_pub_socket.get(zmq::sockopt::last_endpoint);
+    LOG << "[" << broker_name() << "] PUB socket bind to " << m_pub_socket.get(zmq::sockopt::last_endpoint);
 
     m_sub_socket.bind(sub_address());
     m_sub_socket.set(zmq::sockopt::subscribe, "");
-    LOG << "[MfxProxyHost] Broker SUB socket bind to " << m_sub_socket.get(zmq::sockopt::last_endpoint);
+    LOG << "[" << broker_name() << "] SUB socket bind to " << m_sub_socket.get(zmq::sockopt::last_endpoint);
 
     m_pair_socket.connect(pair_address);
-    LOG << "[MfxProxyHost] Broker PAIR socket connected to " << pair_address;
+    LOG << "[" << broker_name() << "] PAIR socket connected to " << pair_address;
 }
 
 void MfxProxyHostBroker::set_host(MfxProxyHost *host) {
@@ -96,23 +97,6 @@ MfxProxyHost &MfxProxyHostBroker::host() {
     return *m_host;
 }
 
-void MfxProxyHostBroker::send_flatbuffer_remote(flatbuffers::FlatBufferBuilder &fbb, uint64_t message_thread_id) {
-    uint8_t *buf = fbb.GetBufferPointer();
-    auto bufsize = fbb.GetSize();
-    assert(bufsize > 0);
-
-    // we copy the data here, which is suboptimal
-    uint32_t effect_id = 0;
-
-    zmq::message_t msg(sizeof(effect_id) + bufsize);
-    memcpy(msg.data(),
-           &effect_id,
-           sizeof(effect_id));
-    memcpy(msg.data<uint8_t>() + sizeof(effect_id),
-           buf,
-           bufsize);
-
-    DEBUG_LOG << "[MfxProxyHost] Message thread " << message_thread_id << " sends message to PAIR";
-
-    auto res = m_pair_socket.send(std::move(msg), zmq::send_flags::none);
+constexpr const char *MfxProxyHostBroker::broker_name() const {
+    return "MfxProxyHostBroker";
 }

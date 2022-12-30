@@ -17,13 +17,12 @@ public:
 
     const char * pub_address() const override;
     const char * sub_address() const override;
+    constexpr const char * broker_name() const override;
     void broker_thread_main() override;
 
     void setup_sockets(const char *pair_address);
     void set_host(MfxProxyHost* host);
     MfxProxyHost& host();
-
-    void send_flatbuffer_remote(flatbuffers::FlatBufferBuilder &fbb, uint64_t message_thread_id);
 
 protected:
     std::string m_pair_address;

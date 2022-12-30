@@ -2,6 +2,7 @@
 
 #include <zmq.hpp>
 #include <thread>
+#include "MfxProxyMessage.h"
 
 class MfxProxyBroker {
 public:
@@ -18,10 +19,14 @@ public:
 
     virtual const char * pub_address() const = 0;
     virtual const char * sub_address() const = 0;
+    virtual constexpr const char * broker_name() const = 0;
 
     virtual void broker_thread_main() = 0;
     void start_thread();
     void join_thread();
+
+    void send_message_pub(MfxProxyMessage&& message);
+    void send_message_pair(MfxProxyMessage&& message);
 
 protected:
     zmq::context_t m_ctx;

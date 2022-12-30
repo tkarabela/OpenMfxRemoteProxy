@@ -38,6 +38,8 @@ public:
         return "inproc://plugin_broker_sub";
     }
 
+    constexpr const char * broker_name() const override;
+
     const char * pair_address() const;
 
     void setup_sockets();
@@ -46,13 +48,11 @@ public:
 
     const BrokerPluginBundleDefinition* get_plugin_definition();
 
-    uint64_t generate_message_thread_id() {
-        return m_rng();
-    }
+    uint32_t generate_message_thread_id();
 
 protected:
     std::string m_pair_address;
-    std::mt19937_64 m_rng;
+    std::mt19937 m_rng;
 
     std::condition_variable m_plugin_definition_cv;
     std::mutex m_plugin_definition_mutex;

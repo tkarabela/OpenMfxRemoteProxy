@@ -7,15 +7,15 @@ using namespace std::chrono_literals;
 
 void MfxProxyPluginBroker::setup_sockets() {
     m_pub_socket.bind(pub_address());
-    LOG << "[MfxProxyPlugin] Broker PUB socket bind to " << m_pub_socket.get(zmq::sockopt::last_endpoint);
+    LOG << "[" << broker_name() << "] PUB socket bind to " << m_pub_socket.get(zmq::sockopt::last_endpoint);
 
     m_sub_socket.bind(sub_address());
     m_sub_socket.set(zmq::sockopt::subscribe, "");
-    LOG << "[MfxProxyPlugin] Broker SUB socket bind to " << m_sub_socket.get(zmq::sockopt::last_endpoint);
+    LOG << "[" << broker_name() << "] SUB socket bind to " << m_sub_socket.get(zmq::sockopt::last_endpoint);
 
     m_pair_socket.bind("tcp://127.0.0.1:*");
     m_pair_address = m_pair_socket.get(zmq::sockopt::last_endpoint);
-    LOG << "[MfxProxyPlugin] Broker PAIR socket bind to " << m_pair_address;
+    LOG << "[" << broker_name() << "] PAIR socket bind to " << m_pair_address;
 }
 
 const char *MfxProxyPluginBroker::pair_address() const {
@@ -29,14 +29,13 @@ void MfxProxyPluginBroker::broker_thread_main() {
 
     // receive RemoteHostStarted
     {
-        zmq::message_t msg;
-        auto res = m_pair_socket.recv(msg);
-        FlatbufferRecvMessage msg_(std::move(msg));
-        auto data = msg_.message_envelope()->message_as_RemoteHostStarted();
-        assert(data);
+        zmq::message_t message;
+        auto res = m_pair_socket.recv(message);
+        MfxProxyMessage message_(std::move(message));
+        auto data = message_.message_as<OpenMfxRemoteProxy::RemoteHostStarted>();
 
         {
-            DEBUG_LOG << "[MfxProxyPlugin] Broker received RemoteHostStarted message";
+            DEBUG_LOG << "[" << broker_name() << "] Received RemoteHostStarted message";
         }
 
         auto plugin_definition = std::make_unique<BrokerPluginBundleDefinition>();
@@ -73,21 +72,26 @@ void MfxProxyPluginBroker::broker_thread_main() {
 
         for (int i = 0; i < n; i++) {
             auto socket_enum = *events[i].user_data;
-            DEBUG_LOG << "[MfxProxyPlugin] Broker got message from socket " << broker_socket_to_string(socket_enum);
-            zmq::message_t msg;
-            events[i].socket.recv(msg, zmq::recv_flags::none);
+            zmq::message_t message;
+            auto res = events[i].socket.recv(message, zmq::recv_flags::none);
+            MfxProxyMessage message_(std::move(message));
+
+            DEBUG_LOG << "[" << broker_name() << "]"
+                      << " Received message " << OpenMfxRemoteProxy::EnumNameMessage(message_.message_type())
+                      << " from " << broker_socket_to_string(socket_enum) << ":"
+                      << " message_id=" << message_.message_id()
+                      << " message_thread_id=" << message_.message_thread_id()
+                      << " effect_id=" << message_.effect_id();
 
             switch (socket_enum) {
                 case BrokerSocket::pair:
                 {
-                    DEBUG_LOG << "[MfxProxyPlugin] Forwarding message to socket SUB";
-                    m_sub_socket.send(std::move(msg), zmq::send_flags::none);
+                    send_message_pub(std::move(message_));
                     break;
                 }
                 case BrokerSocket::sub:
                 {
-                    DEBUG_LOG << "[MfxProxyPlugin] Forwarding message to socket PAIR";
-                    m_pair_socket.send(std::move(msg), zmq::send_flags::none);
+                    send_message_pair(std::move(message_));
                     break;
                 }
                 default:
@@ -110,4 +114,12 @@ const MfxProxyPluginBroker::BrokerPluginBundleDefinition *MfxProxyPluginBroker::
     }
 
     return m_plugin_definition.get();
+}
+
+uint32_t MfxProxyPluginBroker::generate_message_thread_id() {
+    return m_rng();
+}
+
+constexpr const char *MfxProxyPluginBroker::broker_name() const {
+    return "MfxProxyPluginBroker";
 }

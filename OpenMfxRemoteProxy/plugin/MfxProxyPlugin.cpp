@@ -82,8 +82,12 @@ OfxStatus MfxProxyPlugin::OfxSetHost(const OfxHost *host, const char *bundle_dir
     }
 
     // find proxy host binary
-    auto proxy_host_path = bundle_dir_path + "/OpenMfxRemoteProxy_Host";
-    // TODO handle .exe on Windows
+    #if defined(WIN32) || defined(WIN64)
+    std::string proxy_host_path = bundle_dir_path + "/OpenMfxRemoteProxy_Host.exe";
+    #else
+    std::string proxy_host_path = bundle_dir_path + "/OpenMfxRemoteProxy_Host";
+    #endif
+
 //    if (!boost::filesystem::exists(proxy_host_path)) {
 //        ERR_LOG << "[MfxProxyEffect] Missing proxy host runner binary: " << proxy_host_path;
 //        return kOfxStatFailed;
@@ -98,6 +102,7 @@ OfxStatus MfxProxyPlugin::OfxSetHost(const OfxHost *host, const char *bundle_dir
     }
     boost::process::child proxy_host_process(proxy_host_path.c_str(), plugin_path, m_broker.pair_address());
     proxy_host_process.detach();
+    // TODO the broker could periodically check up if the process is still running and poison the plugin if not
 
     // setup effects
     auto plugin_definition = m_broker.get_plugin_definition();
