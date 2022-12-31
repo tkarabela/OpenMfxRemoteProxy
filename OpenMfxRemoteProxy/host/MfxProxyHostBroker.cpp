@@ -97,6 +97,6 @@ MfxProxyHost &MfxProxyHostBroker::host() {
     return *m_host;
 }
 
-constexpr const char *MfxProxyHostBroker::broker_name() const {
+const char *MfxProxyHostBroker::broker_name() const {
     return "MfxProxyHostBroker";
 }

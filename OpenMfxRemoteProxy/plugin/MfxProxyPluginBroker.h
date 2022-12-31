@@ -38,7 +38,7 @@ public:
         return "inproc://plugin_broker_sub";
     }
 
-    constexpr const char * broker_name() const override;
+    const char * broker_name() const override;
 
     const char * pair_address() const;
 

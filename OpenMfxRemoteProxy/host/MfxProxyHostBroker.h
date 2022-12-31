@@ -17,7 +17,7 @@ public:
 
     const char * pub_address() const override;
     const char * sub_address() const override;
-    constexpr const char * broker_name() const override;
+    const char * broker_name() const override;
     void broker_thread_main() override;
 
     void setup_sockets(const char *pair_address);

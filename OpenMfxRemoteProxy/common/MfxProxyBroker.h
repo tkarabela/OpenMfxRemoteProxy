@@ -19,7 +19,7 @@ public:
 
     virtual const char * pub_address() const = 0;
     virtual const char * sub_address() const = 0;
-    virtual constexpr const char * broker_name() const = 0;
+    virtual const char * broker_name() const = 0;
 
     virtual void broker_thread_main() = 0;
     void start_thread();

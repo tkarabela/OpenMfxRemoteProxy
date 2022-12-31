@@ -120,6 +120,6 @@ uint32_t MfxProxyPluginBroker::generate_message_thread_id() {
     return m_rng();
 }
 
-constexpr const char *MfxProxyPluginBroker::broker_name() const {
+const char *MfxProxyPluginBroker::broker_name() const {
     return "MfxProxyPluginBroker";
 }

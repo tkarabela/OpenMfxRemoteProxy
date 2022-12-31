@@ -72,7 +72,7 @@ OfxStatus MfxProxyPlugin::OfxSetHost(const OfxHost *host, const char *bundle_dir
     boost::property_tree::ptree config_tree;
     std::string plugin_path;
     try {
-        boost::property_tree::read_ini(config_path.c_str(), config_tree);
+        boost::property_tree::read_ini(config_path.string(), config_tree);
         plugin_path = config_tree.get<std::string>("plugin_path");
     } catch (std::runtime_error &err) {
         ERR_LOG << "[MfxProxyEffect] Failed when reading config file: " << config_path << " - " << err.what();
